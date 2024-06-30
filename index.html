@@ -21,12 +21,12 @@ body {
 </style>
 
 <script>
-const shareLimitBytes = {{.ShareLimitBytes}};
+const messageLimitBytes = {{.MessageLimitBytes}};
 const retentionLimitMinutes = {{.RetentionLimitMinutes}};
 
 function updateLimitText() {
-    var bytes = new TextEncoder().encode($('#share').val()).length;
-    $('#count').text(bytes + '/' + shareLimitBytes + ' bytes');
+    var bytes = new TextEncoder().encode($('#message').val()).length;
+    $('#count').text(bytes + '/' + messageLimitBytes + ' bytes');
 }
 
 function updatePasswordVisibility() {
@@ -39,39 +39,48 @@ function updatePasswordVisibility() {
 
 $(document).ready(function() {
     // We don't really care about bytes vs characters at this point
-    $('#share').attr('maxlength', shareLimitBytes);
+    $('#message').attr('maxlength', messageLimitBytes);
     updateLimitText();
     updatePasswordVisibility();
 
-    // Remove options that exceed the retention limit
-    $('#retention option').each(function() {
-        if (parseInt($(this).val()) > retentionLimitMinutes) {
-            $(this).remove();
-        }
+    // Remove options that exceed the retention limit (unless it's unlimited)
+    if (retentionLimitMinutes !== 0) {
+        $('#retention option').each(function() {
+            if (parseInt($(this).val()) > retentionLimitMinutes) {
+                $(this).remove();
+            }
+            if (parseInt($(this).val()) === 0) {
+                $(this).remove();
+            }
+        });
+    }
 
-        // Remove the "Forever" option if the retention limit is not 0
-        if (parseInt($(this).val()) === 0 && retentionLimitMinutes !== 0) {
-            $(this).remove();
+    // Select the last available retention option that is not 0 (forever)
+    if ($('#retention option').length > 0) {
+        if ($('#retention option:last').val() !== '0') {
+            $('#retention option:last').prop('selected', true);
+        } else {
+            $('#retention option').eq(-2).prop('selected', true);
         }
-    });
+    }
 
     $('#generate').click(function() {
-        // Check if the content is not empty and byte size is within the limit
-        if ($('#share').val().length === 0) {
-            alert('Please enter some text to share.');
+        if ($('#message').val().length === 0) {
+            alert('Please enter some text in Message.');
             return;
         }
 
-        if (new TextEncoder().encode($('#share').val()).length > shareLimitBytes) {
-            alert('The share content is too long.');
+        if (new TextEncoder().encode($('#message').val()).length > messageLimitBytes) {
+            alert('The message content is too long.');
             return;
         }
 
-        // Send a POST request to /share with the share content
-        $.post('/share', { share: $('#share').val() }, function(data) {
-            // Display the unique URL
+        $.post('/save', { user_token: 'default', message_data: $('#message').val(), retention: $('#retention').val()}).done(function(data) {
             $('#url').val(data).show();
             $('#copy').show();
+        })
+        .fail(function(xhr, status, error) {
+            alert('Failed to generate URL. Please try again later.');
         });
     });
 
@@ -80,7 +89,7 @@ $(document).ready(function() {
         document.execCommand('copy');
     });
 
-    $('#share').on('input', updateLimitText);
+    $('#message').on('input', updateLimitText);
 
     $('#password').change(updatePasswordVisibility);
 });
@@ -89,23 +98,23 @@ $(document).ready(function() {
 <body>
 <h1>One Time Share</h1>
 
-<label for="share">Message:</label>
-<textarea id="share" rows="4" cols="50" maxlength="1000" autocomplete="off"></textarea>
+<label for="message">Message:</label>
+<textarea id="message" rows="4" cols="50" maxlength="1000" autocomplete="off"></textarea>
 <div id="count" style="margin-bottom: 10px;">0/? bytes</div>
 
 <div>
     <label for="retention">Retention:</label>
     <select id="retention" style="margin-bottom: 10px;">
-        <option value="1">1 hour</option>
-        <option value="6">6 hours</option>
-        <option value="12">12 hours</option>
-        <option value="24">1 day</option>
-        <option value="168">7 days</option>
-        <option value="720">30 days</option>
+        <option value="60">1 hour</option>
+        <option value="360">6 hours</option>
+        <option value="720">12 hours</option>
+        <option value="1440">1 day</option>
+        <option value="10080">7 days</option>
+        <option value="43200">30 days</option>
         <option value="0">Forever</option>
     </select>
 </div>
-
+<!-- Password protection is not implemented yet
 <div style="margin-bottom: 10px;">
     <div class="item">
         <input type="checkbox" id="password" autocomplete="off">
@@ -114,7 +123,7 @@ $(document).ready(function() {
 
     <input type="password" id="passwordField" placeholder="Password" style="display: none;" autocomplete="off">
 </div>
-
+-->
 <button id="generate" style="margin-bottom: 10px;">Generate URL</button>
 
 <div>
