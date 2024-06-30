@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>One Time Share</title>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f0f0f0;
+}
+</style>
+
+<script>
+const shareLimitBytes = {{.ShareLimitBytes}};
+const retentionLimitMinutes = {{.RetentionLimitMinutes}};
+
+function updateLimitText() {
+    var bytes = new TextEncoder().encode($('#share').val()).length;
+    $('#count').text(bytes + '/' + shareLimitBytes + ' bytes');
+}
+
+function updatePasswordVisibility() {
+    if ($('#password').is(':checked')) {
+        $('#passwordField').show();
+    } else {
+        $('#passwordField').hide();
+    }
+}
+
+$(document).ready(function() {
+    // We don't really care about bytes vs characters at this point
+    $('#share').attr('maxlength', shareLimitBytes);
+    updateLimitText();
+    updatePasswordVisibility();
+
+    // Remove options that exceed the retention limit
+    $('#retention option').each(function() {
+        if (parseInt($(this).val()) > retentionLimitMinutes) {
+            $(this).remove();
+        }
+
+        // Remove the "Forever" option if the retention limit is not 0
+        if (parseInt($(this).val()) === 0 && retentionLimitMinutes !== 0) {
+            $(this).remove();
+        }
+    });
+
+    $('#generate').click(function() {
+        // Check if the content is not empty and byte size is within the limit
+        if ($('#share').val().length === 0) {
+            alert('Please enter some text to share.');
+            return;
+        }
+
+        if (new TextEncoder().encode($('#share').val()).length > shareLimitBytes) {
+            alert('The share content is too long.');
+            return;
+        }
+
+        // Send a POST request to /share with the share content
+        $.post('/share', { share: $('#share').val() }, function(data) {
+            // Display the unique URL
+            $('#url').val(data).show();
+            $('#copy').show();
+        });
+    });
+
+    $('#copy').click(function() {
+        $('#url').select();
+        document.execCommand('copy');
+    });
+
+    $('#share').on('input', updateLimitText);
+
+    $('#password').change(updatePasswordVisibility);
+});
+</script>
+</head>
+<body>
+<h1>One Time Share</h1>
+
+<label for="share">Message:</label>
+<textarea id="share" rows="4" cols="50" maxlength="1000" autocomplete="off"></textarea>
+<div id="count" style="margin-bottom: 10px;">0/? bytes</div>
+
+<div>
+    <label for="retention">Retention:</label>
+    <select id="retention" style="margin-bottom: 10px;">
+        <option value="1">1 hour</option>
+        <option value="6">6 hours</option>
+        <option value="12">12 hours</option>
+        <option value="24">1 day</option>
+        <option value="168">7 days</option>
+        <option value="720">30 days</option>
+        <option value="0">Forever</option>
+    </select>
+</div>
+
+<div style="margin-bottom: 10px;">
+    <div class="item">
+        <input type="checkbox" id="password" autocomplete="off">
+        <label for="password">Encrypt with password</label>
+    </div>
+
+    <input type="password" id="passwordField" placeholder="Password" style="display: none;" autocomplete="off">
+</div>
+
+<button id="generate" style="margin-bottom: 10px;">Generate URL</button>
+
+<div>
+    <input id="url" type="text" size="50" readonly style="display: none;" autocomplete="off">
+    <button id="copy" style="display: none;">Copy URL</button>
+</div>
+</body>
+</html>
