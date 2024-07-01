@@ -24,3 +24,7 @@ go.work.sum
 
 # IDE files
 .idea
+
+# Machine-specific files
+*.pem
+

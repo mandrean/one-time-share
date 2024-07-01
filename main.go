@@ -162,11 +162,13 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expireTimestamp := time.Now().Add(time.Duration(requestedRetentionLimitMinutes) * time.Minute).Unix()
-
 	globalStaticData.database.SetUserLastMessageCreationTime(userToken, time.Now().Unix())
 
 	messageToken := uuid.New().String()
+	var expireTimestamp int64 = 0
+	if requestedRetentionLimitMinutes > 0 {
+		time.Now().Add(time.Duration(requestedRetentionLimitMinutes) * time.Minute).Unix()
+	}
 
 	err = globalStaticData.database.SaveMessage(messageToken, expireTimestamp, messageData)
 	if err != nil {
@@ -175,6 +177,7 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// to ensure the message is sent encrypted we need to use https
 	urlToShare := "https://" + r.Host + "/shared/" + messageToken
 
 	_, err = fmt.Fprintf(w, urlToShare)
@@ -269,11 +272,11 @@ func handleRequests() {
 	http.HandleFunc("/consume", tryConsumeExistingMessage)
 	http.HandleFunc("/limits", getLimits)
 	http.HandleFunc("/shared/", sharedPage)
-	log.Fatal(http.ListenAndServe(":10000", nil))
+	log.Fatal(http.ListenAndServeTLS(":10000", "cert.pem", "key.pem", nil))
 }
 
 func startOldMessagesCleaner(db *database.OneTimeShareDb) {
-	clearFrequency := time.Hour
+	clearFrequency := time.Minute
 
 	db.ClearExpiredMessages(time.Now().Unix())
 
