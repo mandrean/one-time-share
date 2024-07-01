@@ -75,7 +75,9 @@ $(document).ready(function() {
             return;
         }
 
-        $.post('/save', { user_token: 'default', message_data: $('#message').val(), retention: $('#retention').val()}).done(function(data) {
+        message = $('#message').val();
+
+        $.post('/save', { user_token: 'default', message_data: message, retention: $('#retention').val()}).done(function(data) {
             $('#url').val(data).show();
             $('#copy').show();
         })

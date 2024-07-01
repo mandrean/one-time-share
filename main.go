@@ -267,8 +267,21 @@ func tryConsumeExistingMessage(w http.ResponseWriter, r *http.Request) {
 	message, expireTimestamp := globalStaticData.database.TryConsumeMessage(messageToken)
 
 	// we don't distinguish between not found and expired messages since this wouldn't be reliable
-		_, err = fmt.Fprintf(w, `{"message": "%s", "status": "ok"}`, *message)
 	if message != nil && (expireTimestamp != 0 && time.Now().Unix() < expireTimestamp) {
+		// sanitize the message to escape newlines, quotes and other special characters
+		sanitizedMessage := ""
+		for _, char := range *message {
+			if char == '\n' {
+				sanitizedMessage += "\\n"
+			} else if char == '"' {
+				sanitizedMessage += "\\\""
+			} else if char == '\\' {
+				sanitizedMessage += "\\\\"
+			} else {
+				sanitizedMessage += string(char)
+			}
+		}
+		_, err = fmt.Fprintf(w, `{"status": "ok", "message": "%s"}`, sanitizedMessage)
 		if err != nil {
 			log.Println("Error while writing response: ", err)
 			return
