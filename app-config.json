@@ -1,0 +1,9 @@
+{
+  "port": "8080",
+  "databasePath": "one-time-share.db",
+  "certPath": "cert.pem",
+  "keyPath": "key.pem",
+  "defaultRetentionLimitMinutes": 43200,
+  "defaultMaxMessageSizeBytes": 1000,
+  "defaultMessageCreationLimitMinutes": 0
+}

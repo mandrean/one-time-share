@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/gameraccoon/one-time-share/database"
 	"github.com/google/uuid"
@@ -29,18 +30,51 @@ type StaticData struct {
 	sharedHtml []byte
 	limits     UserLimits
 	database   *database.OneTimeShareDb
+	config     Config
+}
+
+type Config struct {
+	// default port for the server
+	Port string
+	// path to the database file
+	DatabasePath string
+	// path to the certificate file
+	CertPath string
+	// path to the key file
+	KeyPath string
+	// default retention limit in minutes
+	DefaultRetentionLimitMinutes int
+	// default max message size in bytes
+	DefaultMaxMessageSizeBytes int
+	// default message creation limit in minutes
+	DefaultMessageCreationLimitMinutes int
+}
+
+func readConfig(filePath string) error {
+	file, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("error while reading config file: %w", err)
+	}
+
+	// use DisallowUnknownFields
+	decoder := json.NewDecoder(bytes.NewReader(file))
+	decoder.DisallowUnknownFields()
+
+	err = decoder.Decode(&globalStaticData.config)
+	if err != nil {
+		return fmt.Errorf("error while parsing config file: %w", err)
+	}
+
+	return nil
 }
 
 func readUserLimits() error {
-	if !globalStaticData.database.DoesUserExist("default") {
-		globalStaticData.database.SetUserLimits("default", 10080, 1000, 1)
-	}
+	globalStaticData.database.SetUserLimits("default", globalStaticData.config.DefaultRetentionLimitMinutes, globalStaticData.config.DefaultMaxMessageSizeBytes, globalStaticData.config.DefaultMessageCreationLimitMinutes)
 
-	retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes := globalStaticData.database.GetUserLimits("default")
 	globalStaticData.limits = UserLimits{
-		RetentionLimitMinutes:       retentionLimitMinutes,
-		MaxMessageSizeBytes:         maxSizeBytes,
-		MessageCreationLimitMinutes: messageCreationLimitMinutes,
+		RetentionLimitMinutes:       globalStaticData.config.DefaultRetentionLimitMinutes,
+		MaxMessageSizeBytes:         globalStaticData.config.DefaultMaxMessageSizeBytes,
+		MessageCreationLimitMinutes: globalStaticData.config.DefaultMessageCreationLimitMinutes,
 	}
 
 	return nil
@@ -167,7 +201,7 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 	messageToken := uuid.New().String()
 	var expireTimestamp int64 = 0
 	if requestedRetentionLimitMinutes > 0 {
-		time.Now().Add(time.Duration(requestedRetentionLimitMinutes) * time.Minute).Unix()
+		expireTimestamp = time.Now().Add(time.Duration(requestedRetentionLimitMinutes) * time.Minute).Unix()
 	}
 
 	err = globalStaticData.database.SaveMessage(messageToken, expireTimestamp, messageData)
@@ -233,14 +267,14 @@ func tryConsumeExistingMessage(w http.ResponseWriter, r *http.Request) {
 	message, expireTimestamp := globalStaticData.database.TryConsumeMessage(messageToken)
 
 	// we don't distinguish between not found and expired messages since this wouldn't be reliable
-	if message != nil && time.Now().Unix() < expireTimestamp {
 		_, err = fmt.Fprintf(w, `{"message": "%s", "status": "ok"}`, *message)
+	if message != nil && (expireTimestamp != 0 && time.Now().Unix() < expireTimestamp) {
 		if err != nil {
 			log.Println("Error while writing response: ", err)
 			return
 		}
 	} else {
-		_, err = fmt.Fprintf(w, `{"message": "", "status": "na"}`)
+		_, err = fmt.Fprintf(w, `{"status": "not-found"}`)
 		if err != nil {
 			log.Println("Error while writing response: ", err)
 			return
@@ -272,7 +306,11 @@ func handleRequests() {
 	http.HandleFunc("/consume", tryConsumeExistingMessage)
 	http.HandleFunc("/limits", getLimits)
 	http.HandleFunc("/shared/", sharedPage)
-	log.Fatal(http.ListenAndServeTLS(":10000", "cert.pem", "key.pem", nil))
+
+	addr := ":" + globalStaticData.config.Port
+	cert := globalStaticData.config.CertPath
+	key := globalStaticData.config.KeyPath
+	log.Fatal(http.ListenAndServeTLS(addr, cert, key, nil))
 }
 
 func startOldMessagesCleaner(db *database.OneTimeShareDb) {
@@ -296,7 +334,13 @@ func startOldMessagesCleaner(db *database.OneTimeShareDb) {
 }
 
 func main() {
-	db, err := database.ConnectDb("./one-time-share.db")
+	err := readConfig("app-config.json")
+	if err != nil {
+		log.Fatal("Error while reading config: ", err)
+		return
+	}
+
+	db, err := database.ConnectDb(globalStaticData.config.DatabasePath)
 	defer db.Disconnect()
 
 	if err != nil {

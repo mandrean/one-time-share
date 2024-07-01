@@ -25,15 +25,17 @@ const messageToken = "{{.MessageToken}}";
 
 $(document).ready(function() {
     $('#show').click(function() {
-        $.post('/consume', { message_token: messageToken}).done(function(data) {
+        $.post('/consume', {message_token: messageToken}).done(function(data) {
             var response = JSON.parse(data);
             if (response.status == 'ok') {
                 $('#welcome').hide();
                 $('#retrieved').show();
                 $('#message').val(response.message);
-            } else {
+            } else if (response.status == 'not-found') {
                 $('#welcome').hide();
-                $('#not-available').show();
+                $('#not-found').show();
+            } else {
+                alert('Unexpected response: ' + response.status);
             }
         })
         .fail(function(xhr, status, error) {
@@ -53,7 +55,7 @@ $(document).ready(function() {
     <p>The message has been retrieved and removed from the server.</p>
     <textarea id="message" name="message" rows="10" cols="40" oninput="updateLimitText()" readonly></textarea>
 </div>
-<div id="not-available" style="display: none; text-align: center;">
+<div id="not-found" style="display: none; text-align: center;">
     <p>The message has either been already read, has expired, or never existed by this link.<br>Contact the person who shared the link with you.</p>
 </div>
 
