@@ -25,9 +25,10 @@ type UserLimits struct {
 
 type StaticData struct {
 	// index.html that we are going to show to the user
-	indexHtml string
-	limits    UserLimits
-	database  *database.OneTimeShareDb
+	indexHtml  string
+	sharedHtml []byte
+	limits     UserLimits
+	database   *database.OneTimeShareDb
 }
 
 func readUserLimits() error {
@@ -46,18 +47,30 @@ func readUserLimits() error {
 }
 
 func setupStaticPages() error {
-	// read the index.html file
-	indexHtml, err := os.ReadFile("index.html")
-	if err != nil {
-		log.Fatal("Error while reading index.html: ", err)
-		return err
+	{
+		// read the index.html file
+		indexHtml, err := os.ReadFile("index.html")
+		if err != nil {
+			log.Fatal("Error while reading index.html: ", err)
+			return err
+		}
+
+		indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.MessageLimitBytes}}"), []byte(fmt.Sprintf("%d", globalStaticData.limits.MaxMessageSizeBytes)))
+		indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.RetentionLimitMinutes}}"), []byte(fmt.Sprintf("%d", globalStaticData.limits.RetentionLimitMinutes)))
+
+		globalStaticData.indexHtml = string(indexHtml)
 	}
 
-	indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.MessageLimitBytes}}"), []byte(fmt.Sprintf("%d", globalStaticData.limits.MaxMessageSizeBytes)))
-	indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.RetentionLimitMinutes}}"), []byte(fmt.Sprintf("%d", globalStaticData.limits.RetentionLimitMinutes)))
+	{
+		// read the shared.html file
+		sharedHtml, err := os.ReadFile("shared.html")
+		if err != nil {
+			log.Fatal("Error while reading shared.html: ", err)
+			return err
+		}
 
-	globalStaticData.indexHtml = string(indexHtml)
-
+		globalStaticData.sharedHtml = sharedHtml
+	}
 	return nil
 }
 
@@ -82,7 +95,6 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read user_token from the request
 	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, "Can't parse form", http.StatusBadRequest)
@@ -110,7 +122,7 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 			timePassedFromLastCreation := time.Now().Sub(time.Unix(lastCreationTime, 0))
 			if timePassedFromLastCreation.Minutes() < float64(messageCreationLimitMinutes) {
 				minutesLeft := messageCreationLimitMinutes - int(timePassedFromLastCreation.Minutes())
-				http.Error(w, "Message creation limit reached. Wait for "+fmt.Sprintf("%d", minutesLeft)+" minutes and repeat", http.StatusBadRequest)
+				http.Error(w, "Message creation limit reached. Wait for "+fmt.Sprintf("%d", minutesLeft)+" minute(s) and repeat", http.StatusBadRequest)
 				return
 			}
 		}
@@ -154,7 +166,6 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 
 	globalStaticData.database.SetUserLastMessageCreationTime(userToken, time.Now().Unix())
 
-	// generate GUID for the message
 	messageToken := uuid.New().String()
 
 	err = globalStaticData.database.SaveMessage(messageToken, expireTimestamp, messageData)
@@ -164,8 +175,33 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// for now just send the message back
-	_, err = fmt.Fprintf(w, messageData)
+	urlToShare := "https://" + r.Host + "/shared/" + messageToken
+
+	_, err = fmt.Fprintf(w, urlToShare)
+	if err != nil {
+		log.Println("Error while writing response: ", err)
+		return
+	}
+}
+
+func sharedPage(w http.ResponseWriter, r *http.Request) {
+	// check if the request is a GET request
+	if r.Method != "GET" {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// read the token from the URL
+	token := r.URL.Path[len("/shared/"):]
+	if token == "" {
+		http.Error(w, "Token is empty", http.StatusBadRequest)
+		return
+	}
+
+	htmlResponse := globalStaticData.sharedHtml
+	htmlResponse = bytes.ReplaceAll(htmlResponse, []byte("{{.MessageToken}}"), []byte(token))
+
+	_, err := fmt.Fprintf(w, string(htmlResponse))
 	if err != nil {
 		log.Println("Error while writing response: ", err)
 		return
@@ -173,11 +209,40 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func tryConsumeExistingMessage(w http.ResponseWriter, r *http.Request) {
-	_, err := fmt.Fprintf(w, "Welcome to the HomePage!")
-	if err != nil {
+	// check if the request is a POST request
+	if r.Method != "POST" {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-	fmt.Println("Endpoint Hit: homePage")
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Can't parse form", http.StatusBadRequest)
+		return
+	}
+
+	messageToken := r.Form.Get("message_token")
+	if messageToken == "" {
+		http.Error(w, "message_token is empty", http.StatusBadRequest)
+		return
+	}
+
+	message, expireTimestamp := globalStaticData.database.TryConsumeMessage(messageToken)
+
+	// we don't distinguish between not found and expired messages since this wouldn't be reliable
+	if message != nil && time.Now().Unix() < expireTimestamp {
+		_, err = fmt.Fprintf(w, `{"message": "%s", "status": "ok"}`, *message)
+		if err != nil {
+			log.Println("Error while writing response: ", err)
+			return
+		}
+	} else {
+		_, err = fmt.Fprintf(w, `{"message": "", "status": "na"}`)
+		if err != nil {
+			log.Println("Error while writing response: ", err)
+			return
+		}
+	}
 }
 
 func getLimits(w http.ResponseWriter, r *http.Request) {
@@ -202,8 +267,29 @@ func handleRequests() {
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/save", createNewMessage)
 	http.HandleFunc("/consume", tryConsumeExistingMessage)
-	http.HandleFunc("/get-limits", getLimits)
+	http.HandleFunc("/limits", getLimits)
+	http.HandleFunc("/shared/", sharedPage)
 	log.Fatal(http.ListenAndServe(":10000", nil))
+}
+
+func startOldMessagesCleaner(db *database.OneTimeShareDb) {
+	clearFrequency := time.Hour
+
+	db.ClearExpiredMessages(time.Now().Unix())
+
+	go func() {
+		for {
+			time.Sleep(clearFrequency)
+
+			// this won't prevent from a race when trying to get data from already closed connection,
+			// but it is a way to gracefully stop the thread
+			if !db.IsConnectionOpened() {
+				break
+			}
+
+			db.ClearExpiredMessages(time.Now().Unix())
+		}
+	}()
 }
 
 func main() {
@@ -230,5 +316,6 @@ func main() {
 		return
 	}
 
+	startOldMessagesCleaner(db)
 	handleRequests()
 }

@@ -79,8 +79,8 @@ $(document).ready(function() {
             $('#url').val(data).show();
             $('#copy').show();
         })
-        .fail(function(xhr, status, error) {
-            alert('Failed to generate URL. Please try again later.');
+        .fail(function(error) {
+            alert('Failed to generate URL: ' + error.responseText);
         });
     });
 

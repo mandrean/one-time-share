@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>One Time Share</title>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f0f0f0;
+}
+</style>
+
+<script>
+const messageToken = "{{.MessageToken}}";
+
+$(document).ready(function() {
+    $('#show').click(function() {
+        $.post('/consume', { message_token: messageToken}).done(function(data) {
+            var response = JSON.parse(data);
+            if (response.status == 'ok') {
+                $('#welcome').hide();
+                $('#retrieved').show();
+                $('#message').val(response.message);
+            } else {
+                $('#welcome').hide();
+                $('#not-available').show();
+            }
+        })
+        .fail(function(xhr, status, error) {
+            alert('Failed to retrieve message: ' + error);
+        });
+    });
+});
+</script>
+</head>
+<body>
+<h1>One Time Share</h1>
+<div id="welcome" style="text-align: center;">
+    <p>When you press the button below we will try to retrieve the message that was shared with this link.<br>If the message still exists it will be displayed here and removed from the server.</p>
+    <button id="show">Show Message</button>
+</div>
+<div id="retrieved" style="display: none; text-align: center;">
+    <p>The message has been retrieved and removed from the server.</p>
+    <textarea id="message" name="message" rows="10" cols="40" oninput="updateLimitText()" readonly></textarea>
+</div>
+<div id="not-available" style="display: none; text-align: center;">
+    <p>The message has either been already read, has expired, or never existed by this link.</p>
+</div>
+</body>
+</html>

@@ -246,11 +246,11 @@ func (database *OneTimeShareDb) SaveMessage(messageToken string, expireTimestamp
 	return nil
 }
 
-func (database *OneTimeShareDb) TryConsumeMessage(messageToken string) (data *string) {
+func (database *OneTimeShareDb) TryConsumeMessage(messageToken string) (data *string, expireTimestamp int64) {
 	database.mutex.Lock()
 	defer database.mutex.Unlock()
 
-	rows, err := database.db.Query(fmt.Sprintf("SELECT id, data FROM messages WHERE message_token='%s'", dbBase.SanitizeString(messageToken)))
+	rows, err := database.db.Query(fmt.Sprintf("SELECT id, data, expire_timestamp FROM messages WHERE message_token='%s'", dbBase.SanitizeString(messageToken)))
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -264,12 +264,12 @@ func (database *OneTimeShareDb) TryConsumeMessage(messageToken string) (data *st
 
 	id := -1
 	if rows.Next() {
-		err := rows.Scan(&id, &data)
+		err := rows.Scan(&id, &data, &expireTimestamp)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 	} else {
-		return nil
+		return nil, 0
 	}
 
 	err = rows.Close()
@@ -284,4 +284,11 @@ func (database *OneTimeShareDb) TryConsumeMessage(messageToken string) (data *st
 	}
 
 	return
+}
+
+func (database *OneTimeShareDb) ClearExpiredMessages(limitTimestamp int64) {
+	database.mutex.Lock()
+	defer database.mutex.Unlock()
+
+	database.db.Exec(fmt.Sprintf("DELETE FROM messages WHERE expire_timestamp<%d", limitTimestamp))
 }

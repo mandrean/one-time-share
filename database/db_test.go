@@ -29,7 +29,7 @@ func connectDb(t *testing.T) *OneTimeShareDb {
 	return db
 }
 
-func createDbAndConnect(t *testing.T, assert *require.Assertions) *OneTimeShareDb {
+func createDbAndConnect(t *testing.T) *OneTimeShareDb {
 	clearDb()
 	return connectDb(t)
 }
@@ -55,7 +55,7 @@ func TestConnection(t *testing.T) {
 
 func TestSanitizeString(t *testing.T) {
 	assert := require.New(t)
-	db := createDbAndConnect(t, assert)
+	db := createDbAndConnect(t)
 	defer clearDb()
 	if db == nil {
 		t.Fail()
@@ -71,7 +71,7 @@ func TestSanitizeString(t *testing.T) {
 
 func TestDatabaseVersion(t *testing.T) {
 	assert := require.New(t)
-	db := createDbAndConnect(t, assert)
+	db := createDbAndConnect(t)
 	defer clearDb()
 	if db == nil {
 		t.Fail()
@@ -114,7 +114,7 @@ func TestDatabaseVersion(t *testing.T) {
 
 func TestGetUserLimits(t *testing.T) {
 	assert := require.New(t)
-	db := createDbAndConnect(t, assert)
+	db := createDbAndConnect(t)
 	defer clearDb()
 	if db == nil {
 		t.Fail()
@@ -138,7 +138,7 @@ func TestGetUserLimits(t *testing.T) {
 
 func TestRemoveUserLimits(t *testing.T) {
 	assert := require.New(t)
-	db := createDbAndConnect(t, assert)
+	db := createDbAndConnect(t)
 	defer clearDb()
 	if db == nil {
 		t.Fail()
@@ -161,7 +161,7 @@ func TestRemoveUserLimits(t *testing.T) {
 
 func TestSaveAndConsumeMessage(t *testing.T) {
 	assert := require.New(t)
-	db := createDbAndConnect(t, assert)
+	db := createDbAndConnect(t)
 	defer clearDb()
 	if db == nil {
 		t.Fail()
@@ -178,40 +178,77 @@ func TestSaveAndConsumeMessage(t *testing.T) {
 
 	err := db.SaveMessage(messageToken1, 100, message1)
 	assert.Nil(err)
-	err = db.SaveMessage(messageToken1, 100, message2)
+	err = db.SaveMessage(messageToken1, 200, message2)
 	assert.NotNil(err)
-	err = db.SaveMessage(messageToken2, 100, message3)
+	err = db.SaveMessage(messageToken2, 300, message3)
 	assert.Nil(err)
 
 	{
-		message := db.TryConsumeMessage(messageToken1)
+		message, expireTimestamp := db.TryConsumeMessage(messageToken1)
 		assert.Equal(message1, *message)
+		assert.Equal(int64(100), expireTimestamp)
 	}
 
 	{
-		message := db.TryConsumeMessage(messageToken1)
+		message, _ := db.TryConsumeMessage(messageToken1)
 		assert.Nil(message)
 	}
 
 	{
-		message := db.TryConsumeMessage(messageToken2)
+		message, expireTimestamp := db.TryConsumeMessage(messageToken2)
 		assert.Equal(message3, *message)
+		assert.Equal(int64(300), expireTimestamp)
 	}
 
 	{
-		message := db.TryConsumeMessage(messageToken2)
+		message, _ := db.TryConsumeMessage(messageToken2)
 		assert.Nil(message)
 	}
 
 	{
-		message := db.TryConsumeMessage("not existing token")
+		message, _ := db.TryConsumeMessage("not existing token")
 		assert.Nil(message)
+	}
+}
+
+func TestClearExpiredMessages(t *testing.T) {
+	assert := require.New(t)
+	db := createDbAndConnect(t)
+	defer clearDb()
+	if db == nil {
+		t.Fail()
+		return
+	}
+	defer db.Disconnect()
+
+	var message1 = "test message 1"
+	var message2 = "test message 2"
+
+	var messageToken1 = "321"
+	var messageToken2 = "123"
+
+	err := db.SaveMessage(messageToken1, 100, message1)
+	assert.Nil(err)
+	err = db.SaveMessage(messageToken2, 200, message2)
+	assert.Nil(err)
+
+	db.ClearExpiredMessages(160)
+
+	{
+		message, _ := db.TryConsumeMessage(messageToken1)
+		assert.Nil(message)
+	}
+
+	{
+		message, expireTimestamp := db.TryConsumeMessage(messageToken2)
+		assert.Equal(message2, *message)
+		assert.Equal(int64(200), expireTimestamp)
 	}
 }
 
 func TestUserLastMessageCreationTime(t *testing.T) {
 	assert := require.New(t)
-	db := createDbAndConnect(t, assert)
+	db := createDbAndConnect(t)
 	defer clearDb()
 	if db == nil {
 		t.Fail()
@@ -220,6 +257,8 @@ func TestUserLastMessageCreationTime(t *testing.T) {
 	defer db.Disconnect()
 
 	token := "123"
+
+	db.SetUserLimits(token, 1, 2, 3)
 
 	{
 		lastTime := db.GetUserLastMessageCreationTime(token)
