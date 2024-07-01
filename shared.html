@@ -46,7 +46,7 @@ $(document).ready(function() {
 <body>
 <h1>One Time Share</h1>
 <div id="welcome" style="text-align: center;">
-    <p>When you press the button below we will try to retrieve the message that was shared with this link.<br>If the message still exists it will be displayed here and removed from the server.</p>
+    <p>When you press the button below the page will try to retrieve the message that was shared with this link.<br>If the message still exists it will be displayed here and removed from the server.</p>
     <button id="show">Show Message</button>
 </div>
 <div id="retrieved" style="display: none; text-align: center;">
@@ -54,7 +54,11 @@ $(document).ready(function() {
     <textarea id="message" name="message" rows="10" cols="40" oninput="updateLimitText()" readonly></textarea>
 </div>
 <div id="not-available" style="display: none; text-align: center;">
-    <p>The message has either been already read, has expired, or never existed by this link.</p>
+    <p>The message has either been already read, has expired, or never existed by this link.<br>Contact the person who shared the link with you.</p>
+</div>
+
+<div id="footer" style="margin-top: 20px; text-align: center; font-size: 0.8em; color: #888;">
+    <p>Written in golang. <a href="https://github.com/gameraccoon/one-time-share">Source code</a></p>
 </div>
 </body>
 </html>
