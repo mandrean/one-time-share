@@ -75,7 +75,8 @@ $(document).ready(function() {
             return;
         }
 
-        message = $('#message').val();
+        // convert to base64
+        message = btoa($('#message').val());
 
         $.post('/save', { user_token: 'default', message_data: message, retention: $('#retention').val()}).done(function(data) {
             $('#url').val(data).show();

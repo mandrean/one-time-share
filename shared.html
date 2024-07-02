@@ -30,7 +30,9 @@ $(document).ready(function() {
             if (response.status == 'ok') {
                 $('#welcome').hide();
                 $('#retrieved').show();
-                $('#message').val(response.message);
+                // decode from base64
+                decodedMessage = atob(response.message)
+                $('#message').val(decodedMessage);
             } else if (response.status == 'not-found') {
                 $('#welcome').hide();
                 $('#not-found').show();
