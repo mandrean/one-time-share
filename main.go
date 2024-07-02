@@ -34,14 +34,18 @@ type StaticData struct {
 }
 
 type Config struct {
-	// default port for the server
+	// port that the server will listen to
 	Port string
 	// path to the database file
 	DatabasePath string
-	// path to the certificate file
+
+	// if true, http will be used instead of https
+	ForceUnprotectedHttp bool
+	// path to the certificate file (ignored if ForceUnprotectedHttp is true)
 	CertPath string
-	// path to the key file
+	// path to the key file (ignored if ForceUnprotectedHttp is true)
 	KeyPath string
+
 	// default retention limit in minutes
 	DefaultRetentionLimitMinutes int
 	// default max message size in bytes
@@ -321,9 +325,19 @@ func handleRequests() {
 	http.HandleFunc("/shared/", sharedPage)
 
 	addr := ":" + globalStaticData.config.Port
-	cert := globalStaticData.config.CertPath
-	key := globalStaticData.config.KeyPath
-	log.Fatal(http.ListenAndServeTLS(addr, cert, key, nil))
+	if globalStaticData.config.ForceUnprotectedHttp {
+		err := http.ListenAndServe(addr, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		cert := globalStaticData.config.CertPath
+		key := globalStaticData.config.KeyPath
+		err := http.ListenAndServeTLS(addr, cert, key, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
 func startOldMessagesCleaner(db *database.OneTimeShareDb) {

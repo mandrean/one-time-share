@@ -1,6 +1,7 @@
 {
   "port": "8080",
   "databasePath": "one-time-share.db",
+  "forceUnprotectedHttp": false,
   "certPath": "cert.pem",
   "keyPath": "key.pem",
   "defaultRetentionLimitMinutes": 43200,
