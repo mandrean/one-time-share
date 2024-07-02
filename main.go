@@ -119,7 +119,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := fmt.Fprintf(w, globalStaticData.indexHtml)
+	_, err := fmt.Fprint(w, globalStaticData.indexHtml)
 	if err != nil {
 		log.Println("Error while writing response: ", err)
 		return
@@ -218,7 +218,7 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 	// to ensure the message is sent encrypted we need to use https
 	urlToShare := "https://" + r.Host + "/shared/" + messageToken
 
-	_, err = fmt.Fprintf(w, urlToShare)
+	_, err = fmt.Fprint(w, urlToShare)
 	if err != nil {
 		log.Println("Error while writing response: ", err)
 		return
@@ -242,7 +242,7 @@ func sharedPage(w http.ResponseWriter, r *http.Request) {
 	htmlResponse := globalStaticData.sharedHtml
 	htmlResponse = bytes.ReplaceAll(htmlResponse, []byte("{{.MessageToken}}"), []byte(token))
 
-	_, err := fmt.Fprintf(w, string(htmlResponse))
+	_, err := fmt.Fprint(w, string(htmlResponse))
 	if err != nil {
 		log.Println("Error while writing response: ", err)
 		return
@@ -291,7 +291,7 @@ func tryConsumeExistingMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		_, err = fmt.Fprintf(w, `{"status": "not-found"}`)
+		_, err = fmt.Fprint(w, `{"status": "not-found"}`)
 		if err != nil {
 			log.Println("Error while writing response: ", err)
 			return

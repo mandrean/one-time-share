@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>One Time Share</title>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -10,7 +11,7 @@
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    padding: 0;
+    padding: 0px 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -18,8 +19,10 @@ body {
     height: 100vh;
     background-color: #f0f0f0;
 }
+textarea {
+    max-width: 100%;
+}
 </style>
-
 <script>
 const messageToken = "{{.MessageToken}}";
 
@@ -55,21 +58,28 @@ $(document).ready(function() {
 <body>
 <h1>One Time Share</h1>
 <div id="welcome" style="text-align: center;">
-    <p>When you press the button below the page will try to retrieve the message that was shared with this link.<br>If the message still exists it will be displayed here and removed from the server.</p>
+    <p>Press the button below to retrieve the message.<br>If the message still exists it will be shown here and removed from the server.<br><b>The message will be shown only once.</b></p>
     <button id="show">Show Message</button>
 </div>
 <div id="retrieved" style="display: none; text-align: center;">
-    <p>The message has been retrieved and removed from the server.</p>
+    <p>The message has been retrieved and <b>removed</b> from the server.</p>
     <textarea id="message" name="message" rows="10" cols="40" oninput="updateLimitText()" readonly></textarea>
     <br>
     <button id="copy">Copy all</button>
 </div>
-<div id="not-found" style="display: none; text-align: center;">
-    <p>The message has either been already read, has expired, or never existed by this link.<br>Contact the person who shared the link with you.</p>
+<div id="not-found" style="display: none;">
+    <p>The message has not been found</p>
+    <p>It may have been:</p>
+    <ul>
+        <li>Seen before and thus destroyed</li>
+        <li>Expired</li>
+        <li>Never existed by this link</li>
+    </ul>
+    <p>Contact the person who provided you the link</p>
 </div>
 
 <div id="footer" style="margin-top: 20px; text-align: center; font-size: 0.8em; color: #888;">
-    <p>Written in golang. <a href="https://github.com/gameraccoon/one-time-share">Source code</a></p>
+    <p>One Time Share - <a href="1ts.dev">1ts.dev</a>. <a href="https://github.com/gameraccoon/one-time-share">Source code</a></p>
 </div>
 </body>
 </html>

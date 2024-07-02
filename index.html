@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>One Time Share</title>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -10,7 +11,7 @@
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    padding: 0;
+    padding: 0px 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -18,8 +19,10 @@ body {
     height: 100vh;
     background-color: #f0f0f0;
 }
+textarea {
+    max-width: 100%;
+}
 </style>
-
 <script>
 const messageLimitBytes = {{.MessageLimitBytes}};
 const retentionLimitMinutes = {{.RetentionLimitMinutes}};
@@ -135,7 +138,7 @@ $(document).ready(function() {
 </div>
 
 <div id="footer" style="margin-top: 20px; text-align: center; font-size: 0.8em; color: #888;">
-    <p>Written in golang. <a href="https://github.com/gameraccoon/one-time-share">Source code</a></p>
+    <p>One Time Share - <a href="1ts.dev">1ts.dev</a>. <a href="https://github.com/gameraccoon/one-time-share">Source code</a></p>
 </div>
 </body>
 </html>
