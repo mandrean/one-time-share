@@ -8,6 +8,7 @@
 *.so
 *.dylib
 *.db
+one-time-share
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,3 +29,5 @@ go.work.sum
 # Machine-specific files
 *.pem
 
+# Temporary files
+artifacts/
