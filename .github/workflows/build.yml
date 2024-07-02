@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: '*'
+    paths-ignore:
+    - README.md
+    - LICENSE
+    - CONTRIBUTING.md
+    - .gitignore
+    - '.github/**'
+    - '!.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Build
+      run: go build -ldflags "-s -w"
+
+    - name: Test
+      run: go test -v ./...
+
+    - name: Copy artifacts to a separate folder
+      run: |
+        mkdir artifacts
+        cp one-time-share app-config.json index.html shared.html artifacts
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: one-time-share_ubuntu-x64
+        path: artifacts/*
