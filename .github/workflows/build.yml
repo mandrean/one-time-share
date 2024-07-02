@@ -31,7 +31,7 @@ jobs:
     - name: Copy artifacts to a separate folder
       run: |
         mkdir artifacts
-        cp one-time-share app-config.json index.html shared.html artifacts
+        cp -r one-time-share app-config.json index.html shared.html tools artifacts
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3

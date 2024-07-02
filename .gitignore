@@ -31,3 +31,5 @@ go.work.sum
 
 # Temporary files
 artifacts/
+logs/
+
