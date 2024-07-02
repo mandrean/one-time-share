@@ -82,8 +82,8 @@ $(document).ready(function() {
         message = btoa($('#message').val());
 
         $.post('/save', { user_token: 'default', message_data: message, retention: $('#retention').val()}).done(function(data) {
-            $('#url').val(data).show();
-            $('#copy').show();
+            $('#url').val(data)
+            $('#url-div').show();
         })
         .fail(function(error) {
             alert('Failed to generate URL: ' + error.responseText);
@@ -132,9 +132,9 @@ $(document).ready(function() {
 -->
 <button id="generate" style="margin-bottom: 10px;">Generate URL</button>
 
-<div>
-    <input id="url" type="text" size="50" readonly style="display: none;" autocomplete="off">
-    <button id="copy" style="display: none;">Copy URL</button>
+<div id="url-div" style="max-width: 100%;display: none;">
+    <input id="url" type="text" size="50" readonly style="max-width: 100%" autocomplete="off">
+    <button id="copy">Copy URL</button>
 </div>
 
 <div id="footer" style="margin-top: 20px; text-align: center; font-size: 0.8em; color: #888;">
