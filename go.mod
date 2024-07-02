@@ -1,6 +1,6 @@
 module github.com/gameraccoon/one-time-share
 
-go 1.22.2
+go 1.22
 
 require (
 	github.com/gameraccoon/telegram-bot-skeleton v0.0.0-20200520210530-8a8557bde900
