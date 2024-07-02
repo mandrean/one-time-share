@@ -44,6 +44,11 @@ $(document).ready(function() {
             alert('Failed to retrieve message: ' + error);
         });
     });
+
+    $('#copy').click(function() {
+        $('#message').select();
+        document.execCommand('copy');
+    });
 });
 </script>
 </head>
@@ -56,6 +61,8 @@ $(document).ready(function() {
 <div id="retrieved" style="display: none; text-align: center;">
     <p>The message has been retrieved and removed from the server.</p>
     <textarea id="message" name="message" rows="10" cols="40" oninput="updateLimitText()" readonly></textarea>
+    <br>
+    <button id="copy">Copy all</button>
 </div>
 <div id="not-found" style="display: none; text-align: center;">
     <p>The message has either been already read, has expired, or never existed by this link.<br>Contact the person who shared the link with you.</p>
