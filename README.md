@@ -23,7 +23,7 @@ This service does not guarantee that the message can not be accessed by a malici
 
 Also if the link gets to a malicious user before the recipient accesses it, the data can be exposed to that malicious user.
 
-And of course, as most of the services today, this service can't give guarantees that it never gets hacked, or that my hosting provider won't access the data on the server. How to deal with that below.
+And of course, as most of the services today, this service can't give guarantees that it never gets hacked, or that my hosting provider won't access the data on the server. Below is some info about how to deal with that.
 
 ### What limitations does the service have?
 
@@ -59,7 +59,9 @@ If you do care that your information is secure, you either need to use some [end
 
 **If you don't use end-to-end encryption, your conversations can be accessed by other people.**
 
-When sending information through this 1ts service, don't add any context to your secret data:
+### What if the service gets hacked?
+
+There's a simple rule: when sending information through this 1ts service don't add any context to your secret data.
 
 Bad:
 > Hi, by the link you will find your login and password, I've also added the URL of the website there just in case.  
@@ -76,7 +78,13 @@ This would make the difference in case our server gets hacked. in the first case
 1. Clone the repository
 2. In `app-config.json` set paths to your TLS certificate and key, or set `forceUnprotectedHttp` to `true` in case you enable HTTPS through a reverse proxy such as nginx
 3. In `app-config.json` set `port` and limits
-4. `go build` to build the executable or `go.run` to run it directly
-5. Use `tools/run_daemon.sh` to start the service in background or configure it to be run as you usually run services
+4. `go build` to build the executable or `go run` to run it directly
+6. Use `tools/run_daemon.sh` to start the service in the background or configure it to be run as you usually run services
 
 Take a look at [build.yaml](https://github.com/gameraccoon/one-time-share/blob/main/.github/workflows/build.yml) to see how I build it.
+
+### Things to think about when setting up your own server
+- Make sure your server runs under HTTPS and is not accessible via HTTP
+  - Using HTTP is as good as broadcasting your private data to everyone in your network
+- Whether you plan to deploy this web service or develop your own for your business, this service can be an easy point of entry for hackers to access other systems. Therefore, you should ensure that no important information (such as access tokens or permanent passwords) is shared, and that the service is secured no less than other sensitive parts of your network.
+  - It's one thing if someone hacks into my server and finds a lot of random data without context, but it's a very different situation if they can understand who the data is shared by and intended for (or potentially even more context about this information).
