@@ -175,7 +175,10 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if maxSizeBytes > 0 && len(messageData) > maxSizeBytes {
+	// since we encode data in base64, the size of the message will be bigger
+	originalSize := calculateDecodedBase64Size(messageData)
+
+	if maxSizeBytes > 0 && originalSize > maxSizeBytes {
 		http.Error(w, "Message is too big", http.StatusBadRequest)
 		return
 	}
@@ -408,4 +411,17 @@ func main() {
 
 	startOldMessagesCleaner(db)
 	handleRequests()
+}
+
+func calculateDecodedBase64Size(data string) int {
+	separatorsCount := 0
+	for i := len(data) - 1; i >= 0; i-- {
+		if data[i] == '=' {
+			separatorsCount++
+		} else {
+			break
+		}
+	}
+
+	return len(data)*3/4 - separatorsCount
 }
