@@ -114,7 +114,7 @@ $(document).ready(function() {
         }
 
         // convert to base64
-        message = btoa($('#message').val());
+        message = btoa(unescape(encodeURIComponent($('#message').val())));
 
         $.post('/save', { user_token: userToken, message_data: message, retention: $('#retention').val()}).done(function(data) {
             $('#url').val(data)

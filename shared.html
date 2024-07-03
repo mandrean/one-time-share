@@ -34,7 +34,7 @@ $(document).ready(function() {
                 $('#welcome').hide();
                 $('#retrieved').show();
                 // decode from base64
-                decodedMessage = atob(response.message)
+                decodedMessage = decodeURIComponent(escape(atob(response.message)))
                 $('#message').val(decodedMessage);
             } else if (response.status == 'not-found') {
                 $('#welcome').hide();
