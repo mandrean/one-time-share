@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -179,14 +180,10 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	requestedRetentionLimitText := r.Form.Get("retention")
-	requestedRetentionLimitMinutes := -1
-	if requestedRetentionLimitText != "" {
-		requestedRetentionLimitMinutes, err = fmt.Sscanf(requestedRetentionLimitText, "%d", &requestedRetentionLimitMinutes)
-		if err != nil {
-			http.Error(w, "Can't parse retention limit", http.StatusBadRequest)
-			return
-		}
+	requestedRetentionLimitMinutes, err := strconv.Atoi(r.Form.Get("retention"))
+	if err != nil {
+		http.Error(w, "Can't parse retention limit", http.StatusBadRequest)
+		return
 	}
 
 	if requestedRetentionLimitMinutes < 0 {
