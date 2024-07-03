@@ -12,8 +12,20 @@ import (
 	"time"
 )
 
-// index.html that we are going to show to the user
 var globalStaticData StaticData
+
+type StaticData struct {
+	// static html page that will be sent when accessing '/' path
+	defaultIndexHtml string
+	// html page that will be sent when accessing '/shared/' path
+	sharedHtml []byte
+	// limits of the default user that we use with '/' page (more users can be added to the db manually)
+	defaultUserLimits UserLimits
+	// database connection, always open while the server is running
+	database *database.OneTimeShareDb
+	// static configuration read from the config file
+	config Config
+}
 
 type UserLimits struct {
 	// how long the message is going to be available (zero means no limit)
@@ -22,15 +34,6 @@ type UserLimits struct {
 	MaxMessageSizeBytes int
 	// how often a new message can be created (zero means no limit)
 	MessageCreationLimitMinutes int
-}
-
-type StaticData struct {
-	// index.html that we are going to show to the user
-	indexHtml  string
-	sharedHtml []byte
-	limits     UserLimits
-	database   *database.OneTimeShareDb
-	config     Config
 }
 
 type Config struct {
@@ -60,7 +63,6 @@ func readConfig(filePath string) error {
 		return fmt.Errorf("error while reading config file: %w", err)
 	}
 
-	// use DisallowUnknownFields
 	decoder := json.NewDecoder(bytes.NewReader(file))
 	decoder.DisallowUnknownFields()
 
@@ -72,10 +74,10 @@ func readConfig(filePath string) error {
 	return nil
 }
 
-func readUserLimits() error {
+func setDefaultUserLimits() error {
 	globalStaticData.database.SetUserLimits("default", globalStaticData.config.DefaultRetentionLimitMinutes, globalStaticData.config.DefaultMaxMessageSizeBytes, globalStaticData.config.DefaultMessageCreationLimitMinutes)
 
-	globalStaticData.limits = UserLimits{
+	globalStaticData.defaultUserLimits = UserLimits{
 		RetentionLimitMinutes:       globalStaticData.config.DefaultRetentionLimitMinutes,
 		MaxMessageSizeBytes:         globalStaticData.config.DefaultMaxMessageSizeBytes,
 		MessageCreationLimitMinutes: globalStaticData.config.DefaultMessageCreationLimitMinutes,
@@ -93,10 +95,10 @@ func setupStaticPages() error {
 			return err
 		}
 
-		indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.MessageLimitBytes}}"), []byte(fmt.Sprintf("%d", globalStaticData.limits.MaxMessageSizeBytes)))
-		indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.RetentionLimitMinutes}}"), []byte(fmt.Sprintf("%d", globalStaticData.limits.RetentionLimitMinutes)))
+		indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.MessageLimitBytes}}"), []byte(fmt.Sprintf("%d", globalStaticData.defaultUserLimits.MaxMessageSizeBytes)))
+		indexHtml = bytes.ReplaceAll(indexHtml, []byte("{{.RetentionLimitMinutes}}"), []byte(fmt.Sprintf("%d", globalStaticData.defaultUserLimits.RetentionLimitMinutes)))
 
-		globalStaticData.indexHtml = string(indexHtml)
+		globalStaticData.defaultIndexHtml = string(indexHtml)
 	}
 
 	{
@@ -119,7 +121,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := fmt.Fprint(w, globalStaticData.indexHtml)
+	_, err := fmt.Fprint(w, globalStaticData.defaultIndexHtml)
 	if err != nil {
 		log.Println("Error while writing response: ", err)
 		return
@@ -307,8 +309,8 @@ func getLimits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write messageLimitBytes and retentionLimitMinutes to the JSON response
-	messageLimitBytes := globalStaticData.limits.MaxMessageSizeBytes
-	retentionLimitMinutes := globalStaticData.limits.RetentionLimitMinutes
+	messageLimitBytes := globalStaticData.defaultUserLimits.MaxMessageSizeBytes
+	retentionLimitMinutes := globalStaticData.defaultUserLimits.RetentionLimitMinutes
 
 	_, err := fmt.Fprintf(w, `{"messageLimitBytes": %d, "retentionLimitMinutes": %d}`, messageLimitBytes, retentionLimitMinutes)
 	if err != nil {
@@ -378,9 +380,9 @@ func main() {
 	database.UpdateVersion(db)
 	globalStaticData.database = db
 
-	err = readUserLimits()
+	err = setDefaultUserLimits()
 	if err != nil {
-		log.Fatal("Error while reading user limits: ", err)
+		log.Fatal("Error while reading user defaultUserLimits: ", err)
 		return
 	}
 
