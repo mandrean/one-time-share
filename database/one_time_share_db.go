@@ -35,7 +35,7 @@ func ConnectDb(path string) (database *OneTimeShareDb, err error) {
 
 	database.db.Exec("CREATE TABLE IF NOT EXISTS" +
 		" users(id INTEGER NOT NULL PRIMARY KEY" +
-		",token TEXT NOT NULL" +
+		",token TEXT NOT NULL UNIQUE" +
 		",retention_limit_minutes INTEGER NOT NULL" +
 		",max_size_bytes INTEGER NOT NULL" +
 		",message_creation_limit_minutes INTEGER NOT NULL" +
@@ -44,7 +44,7 @@ func ConnectDb(path string) (database *OneTimeShareDb, err error) {
 
 	database.db.Exec("CREATE TABLE IF NOT EXISTS" +
 		" messages(id INTEGER NOT NULL PRIMARY KEY" +
-		",message_token TEXT NOT NULL" +
+		",message_token TEXT NOT NULL UNIQUE" +
 		",expire_timestamp INTEGER NOT NULL" +
 		",data TEXT NOT NULL" +
 		")")
@@ -115,7 +115,32 @@ func (database *OneTimeShareDb) SetUserLimits(token string, retentionLimitMinute
 	database.mutex.Lock()
 	defer database.mutex.Unlock()
 
-	database.db.Exec(fmt.Sprintf("INSERT OR REPLACE INTO users (token, retention_limit_minutes, max_size_bytes, message_creation_limit_minutes) VALUES ('%s', %d, %d, %d)", dbBase.SanitizeString(token), retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes))
+	sanitizedToken := dbBase.SanitizeString(token)
+
+	rows, err := database.db.Query(fmt.Sprintf("SELECT id FROM users WHERE token='%s'", sanitizedToken))
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+	}(rows)
+
+	hasUser := rows.Next()
+
+	err = rows.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if hasUser {
+		database.db.Exec(fmt.Sprintf("UPDATE users SET retention_limit_minutes=%d, max_size_bytes=%d, message_creation_limit_minutes=%d WHERE token='%s'", retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes, sanitizedToken))
+	} else {
+		database.db.Exec(fmt.Sprintf("INSERT INTO users (token, retention_limit_minutes, max_size_bytes, message_creation_limit_minutes) VALUES ('%s', %d, %d, %d)", sanitizedToken, retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes))
+	}
 }
 
 func (database *OneTimeShareDb) GetUserLimits(token string) (isFound bool, retentionLimitMinutes int, maxSizeBytes int, messageCreationLimitMinutes int) {

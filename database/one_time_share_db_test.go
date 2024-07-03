@@ -169,6 +169,39 @@ func TestRemoveUserLimits(t *testing.T) {
 	assert.False(db.DoesUserExist(token2))
 }
 
+func TestUpdateUserLimits(t *testing.T) {
+	assert := require.New(t)
+	db := createDbAndConnect(t)
+	defer clearDb()
+	if db == nil {
+		t.Fail()
+		return
+	}
+	defer db.Disconnect()
+
+	token := "321"
+
+	db.SetUserLimits(token, 1, 2, 3)
+
+	{
+		isFound, retentionLimitMinutes, maxSizeBytes, shareCreationLimitMinutes := db.GetUserLimits(token)
+		assert.True(isFound)
+		assert.Equal(1, retentionLimitMinutes)
+		assert.Equal(2, maxSizeBytes)
+		assert.Equal(3, shareCreationLimitMinutes)
+	}
+
+	db.SetUserLimits(token, 4, 5, 6)
+
+	{
+		isFound, retentionLimitMinutes, maxSizeBytes, shareCreationLimitMinutes := db.GetUserLimits(token)
+		assert.True(isFound)
+		assert.Equal(4, retentionLimitMinutes)
+		assert.Equal(5, maxSizeBytes)
+		assert.Equal(6, shareCreationLimitMinutes)
+	}
+}
+
 func TestSaveAndConsumeMessage(t *testing.T) {
 	assert := require.New(t)
 	db := createDbAndConnect(t)
@@ -286,4 +319,25 @@ func TestUserLastMessageCreationTime(t *testing.T) {
 		lastTime := db.GetUserLastMessageCreationTime(token)
 		assert.Equal(int64(200), lastTime)
 	}
+}
+
+func TestSettingLimitsDoesNotChangeLastMessageCreationTime(t *testing.T) {
+	assert := require.New(t)
+	db := createDbAndConnect(t)
+	defer clearDb()
+	if db == nil {
+		t.Fail()
+		return
+	}
+	defer db.Disconnect()
+
+	token := "123"
+	db.SetUserLimits(token, 0, 0, 0)
+
+	db.SetUserLastMessageCreationTime(token, 100)
+	assert.Equal(int64(100), db.GetUserLastMessageCreationTime(token))
+
+	db.SetUserLimits(token, 1, 2, 3)
+
+	assert.Equal(int64(100), db.GetUserLastMessageCreationTime(token))
 }
