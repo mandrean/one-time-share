@@ -90,7 +90,6 @@ function updateWithUserToken(token) {
     // send a get request to /limits
     $.get('/limits', { user_token: token }).done(function(data) {
         var response = JSON.parse(data);
-        alert('data: ' + data);
         messageLimitBytes = response.message_limit_bytes;
         retentionLimitMinutes = response.retention_limit_minutes;
         updatePageElementsFromLimits();
