@@ -147,12 +147,12 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !globalStaticData.database.DoesUserExist(userToken) {
+	isFound, retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes := globalStaticData.database.GetUserLimits(userToken)
+
+	if !isFound {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-
-	retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes := globalStaticData.database.GetUserLimits(userToken)
 
 	if messageCreationLimitMinutes > 0 {
 		// check if the user can create a new message
@@ -191,10 +191,12 @@ func createNewMessage(w http.ResponseWriter, r *http.Request) {
 
 	if requestedRetentionLimitMinutes < 0 {
 		http.Error(w, "Invalid retention limit", http.StatusBadRequest)
+		return
 	}
 
 	if requestedRetentionLimitMinutes == 0 && retentionLimitMinutes > 0 {
 		http.Error(w, "Can't set unlimited retention limit, not allowed", http.StatusBadRequest)
+		return
 	}
 
 	if requestedRetentionLimitMinutes > 0 && retentionLimitMinutes > 0 && requestedRetentionLimitMinutes > retentionLimitMinutes {
@@ -308,11 +310,26 @@ func getLimits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// write messageLimitBytes and retentionLimitMinutes to the JSON response
-	messageLimitBytes := globalStaticData.defaultUserLimits.MaxMessageSizeBytes
-	retentionLimitMinutes := globalStaticData.defaultUserLimits.RetentionLimitMinutes
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Can't parse form", http.StatusBadRequest)
+		return
+	}
 
-	_, err := fmt.Fprintf(w, `{"messageLimitBytes": %d, "retentionLimitMinutes": %d}`, messageLimitBytes, retentionLimitMinutes)
+	userToken := r.Form.Get("user_token")
+	if userToken == "" {
+		http.Error(w, "user_token is empty", http.StatusBadRequest)
+		return
+	}
+
+	isFound, retentionLimitMinutes, messageLimitBytes, _ := globalStaticData.database.GetUserLimits(userToken)
+
+	if !isFound {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	_, err = fmt.Fprintf(w, `{"message_limit_bytes": %d, "retention_limit_minutes": %d}`, messageLimitBytes, retentionLimitMinutes)
 	if err != nil {
 		log.Println("Error while writing response: ", err)
 		return

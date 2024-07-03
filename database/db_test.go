@@ -125,15 +125,25 @@ func TestGetUserLimits(t *testing.T) {
 	var token1 = "321"
 	var token2 = "123"
 
+	{
+		isFound, _, _, _ := db.GetUserLimits(token1)
+		assert.False(isFound)
+	}
+
+	assert.False(db.DoesUserExist(token1))
+
 	db.SetUserLimits(token1, 1, 2, 3)
 	assert.True(db.DoesUserExist(token1))
 
-	retentionLimitMinutes, maxSizeBytes, shareCreationLimitMinutes := db.GetUserLimits(token1)
+	{
+		isFound, retentionLimitMinutes, maxSizeBytes, shareCreationLimitMinutes := db.GetUserLimits(token1)
 
-	assert.False(db.DoesUserExist(token2))
-	assert.Equal(1, retentionLimitMinutes)
-	assert.Equal(2, maxSizeBytes)
-	assert.Equal(3, shareCreationLimitMinutes)
+		assert.True(isFound)
+		assert.False(db.DoesUserExist(token2))
+		assert.Equal(1, retentionLimitMinutes)
+		assert.Equal(2, maxSizeBytes)
+		assert.Equal(3, shareCreationLimitMinutes)
+	}
 }
 
 func TestRemoveUserLimits(t *testing.T) {

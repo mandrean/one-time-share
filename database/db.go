@@ -118,7 +118,7 @@ func (database *OneTimeShareDb) SetUserLimits(token string, retentionLimitMinute
 	database.db.Exec(fmt.Sprintf("INSERT OR REPLACE INTO users (token, retention_limit_minutes, max_size_bytes, message_creation_limit_minutes) VALUES ('%s', %d, %d, %d)", dbBase.SanitizeString(token), retentionLimitMinutes, maxSizeBytes, messageCreationLimitMinutes))
 }
 
-func (database *OneTimeShareDb) GetUserLimits(token string) (retentionLimitMinutes int, maxSizeBytes int, messageCreationLimitMinutes int) {
+func (database *OneTimeShareDb) GetUserLimits(token string) (isFound bool, retentionLimitMinutes int, maxSizeBytes int, messageCreationLimitMinutes int) {
 	database.mutex.Lock()
 	defer database.mutex.Unlock()
 
@@ -134,16 +134,13 @@ func (database *OneTimeShareDb) GetUserLimits(token string) (retentionLimitMinut
 	}(rows)
 
 	if rows.Next() {
+		isFound = true
 		err := rows.Scan(&retentionLimitMinutes, &maxSizeBytes, &messageCreationLimitMinutes)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 	} else {
-		err = rows.Err()
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("can't find limits for token '%s'", token)
+		isFound = false
 	}
 
 	return

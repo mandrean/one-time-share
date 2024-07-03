@@ -24,12 +24,30 @@ textarea {
 }
 </style>
 <script>
-const messageLimitBytes = {{.MessageLimitBytes}};
-const retentionLimitMinutes = {{.RetentionLimitMinutes}};
+var messageLimitBytes = {{.MessageLimitBytes}};
+var retentionLimitMinutes = {{.RetentionLimitMinutes}};
+var userToken = 'default';
+
+const retentionOptions = [
+    { value: 60, text: '1 hour' },
+    { value: 360, text: '6 hours' },
+    { value: 720, text: '12 hours' },
+    { value: 1440, text: '1 day' },
+    { value: 10080, text: '7 days' },
+    { value: 43200, text: '30 days' },
+    { value: 0, text: 'Forever' }
+];
+
+function getMessageSizeBytes() {
+    return new TextEncoder().encode($('#message').val()).length;
+}
 
 function updateLimitText() {
-    var bytes = new TextEncoder().encode($('#message').val()).length;
-    $('#count').text(bytes + '/' + messageLimitBytes + ' bytes');
+    if (messageLimitBytes !== 0) {
+        $('#count').text(getMessageSizeBytes() + '/' + messageLimitBytes + ' bytes');
+    } else {
+        $('#count').text('');
+    }
 }
 
 function updatePasswordVisibility() {
@@ -40,22 +58,22 @@ function updatePasswordVisibility() {
     }
 }
 
-$(document).ready(function() {
-    // We don't really care about bytes vs characters at this point
-    $('#message').attr('maxlength', messageLimitBytes);
+function updatePageElementsFromLimits() {
+    if (messageLimitBytes !== 0) {
+        // We don't really care about bytes vs characters at this point
+        $('#message').attr('maxlength', messageLimitBytes);
+    } else {
+        $('#message').removeAttr('maxlength');
+    }
     updateLimitText();
     updatePasswordVisibility();
 
-    // Remove options that exceed the retention limit (unless it's unlimited)
-    if (retentionLimitMinutes !== 0) {
-        $('#retention option').each(function() {
-            if (parseInt($(this).val()) > retentionLimitMinutes) {
-                $(this).remove();
-            }
-            if (parseInt($(this).val()) === 0) {
-                $(this).remove();
-            }
-        });
+    $('#retention').empty();
+    for (var i = 0; i < retentionOptions.length; i++) {
+        if (retentionLimitMinutes === 0 || (retentionOptions[i].value!==0 && retentionOptions[i].value <= retentionLimitMinutes)) {
+            var option = $('<option>').val(retentionOptions[i].value).text(retentionOptions[i].text);
+            $('#retention').append(option);
+        }
     }
 
     // Select the last available retention option that is not 0 (forever)
@@ -66,6 +84,24 @@ $(document).ready(function() {
             $('#retention option').eq(-2).prop('selected', true);
         }
     }
+}
+
+function updateWithUserToken(token) {
+    // send a get request to /limits
+    $.get('/limits', { user_token: token }).done(function(data) {
+        var response = JSON.parse(data);
+        alert('data: ' + data);
+        messageLimitBytes = response.message_limit_bytes;
+        retentionLimitMinutes = response.retention_limit_minutes;
+        updatePageElementsFromLimits();
+        userToken = token;
+    }).fail(function(error) {
+        alert('Failed to update limits: ' + error.responseText);
+    });
+}
+
+$(document).ready(function() {
+    updatePageElementsFromLimits();
 
     $('#generate').click(function() {
         if ($('#message').val().length === 0) {
@@ -73,7 +109,7 @@ $(document).ready(function() {
             return;
         }
 
-        if (new TextEncoder().encode($('#message').val()).length > messageLimitBytes) {
+        if (messageLimitBytes !== 0 && getMessageSizeBytes > messageLimitBytes) {
             alert('The message content is too long.');
             return;
         }
@@ -81,7 +117,7 @@ $(document).ready(function() {
         // convert to base64
         message = btoa($('#message').val());
 
-        $.post('/save', { user_token: 'default', message_data: message, retention: $('#retention').val()}).done(function(data) {
+        $.post('/save', { user_token: userToken, message_data: message, retention: $('#retention').val()}).done(function(data) {
             $('#url').val(data)
             $('#url-div').show();
         })
@@ -98,11 +134,20 @@ $(document).ready(function() {
     $('#message').on('input', updateLimitText);
 
     $('#password').change(updatePasswordVisibility);
+
+    $('#updateLimits').click(function() {
+        updateWithUserToken($('#userToken').val());
+    });
 });
 </script>
 </head>
 <body>
 <h1>One Time Share</h1>
+
+<div style="display: none;">
+    <input type="text" id="userToken" placeholder="User token" autocomplete="off">
+    <button id="updateLimits">Update limits</button>
+</div>
 
 <label for="message">Message:</label>
 <textarea id="message" rows="4" cols="50" maxlength="1000" autocomplete="off"></textarea>
@@ -110,15 +155,7 @@ $(document).ready(function() {
 
 <div>
     <label for="retention">Retention:</label>
-    <select id="retention" style="margin-bottom: 10px;">
-        <option value="60">1 hour</option>
-        <option value="360">6 hours</option>
-        <option value="720">12 hours</option>
-        <option value="1440">1 day</option>
-        <option value="10080">7 days</option>
-        <option value="43200">30 days</option>
-        <option value="0">Forever</option>
-    </select>
+    <select id="retention" style="margin-bottom: 10px;"></select>
 </div>
 <!-- Password protection is not implemented yet
 <div style="margin-bottom: 10px;">
