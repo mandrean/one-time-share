@@ -1,0 +1,15 @@
+[package]
+name = "one-time-share"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-std = { version = "1.12", features = ["attributes"] }
+base64 = "0.22"
+http-types = "2.12"
+rusqlite = "0.31"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tide = "0.16"
+tide-rustls = "0.3.0"
+uuid = { version = "1.9", features = ["v4"] }
