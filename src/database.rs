@@ -10,7 +10,8 @@ pub struct OneTimeShareDb {
 
 impl OneTimeShareDb {
     pub fn connect(path: &str) -> Result<Self> {
-        let conn = Connection::open(path)?;
+        //let conn = Connection::open(path)?;
+        let conn = Connection::open_in_memory()?;
         let db = OneTimeShareDb {
             conn: Arc::new(Mutex::new(conn)),
         };
