@@ -10,6 +10,7 @@ http-types = "2.12"
 rusqlite = "0.31"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tempfile = "3.10"
 tide = "0.16"
 tide-rustls = "0.3.0"
 uuid = { version = "1.9", features = ["v4"] }

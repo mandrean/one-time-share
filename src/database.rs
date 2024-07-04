@@ -226,3 +226,153 @@ impl DbUpdater {
         (self.update_db)(db)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    fn setup_db() -> OneTimeShareDb {
+        let temp_file = NamedTempFile::new().unwrap();
+        OneTimeShareDb::connect(temp_file.path().to_str().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_get_and_set_database_version() {
+        let db = setup_db();
+        assert_eq!(db.get_database_version().unwrap(), LATEST_VERSION);
+
+        db.set_database_version("0.2").unwrap();
+        assert_eq!(db.get_database_version().unwrap(), "0.2");
+    }
+
+    #[test]
+    fn test_set_and_get_user_limits() {
+        let db = setup_db();
+        db.set_user_limits("user1", 60, 1024, 5).unwrap();
+
+        let (found, retention, max_size, creation_limit) = db.get_user_limits("user1").unwrap();
+        assert!(found);
+        assert_eq!(retention, 60);
+        assert_eq!(max_size, 1024);
+        assert_eq!(creation_limit, 5);
+    }
+
+    #[test]
+    fn test_set_and_get_user_last_message_creation_time() {
+        let db = setup_db();
+        db.set_user_limits("user1", 60, 1024, 5).unwrap();
+
+        db.set_user_last_message_creation_time("user1", 12345)
+            .unwrap();
+        let timestamp = db.get_user_last_message_creation_time("user1").unwrap();
+        assert_eq!(timestamp, 12345);
+    }
+
+    #[test]
+    fn test_save_and_consume_message() {
+        let db = setup_db();
+        db.save_message("token1", 12345, "Hello, world!").unwrap();
+
+        let (data, expire) = db.try_consume_message("token1").unwrap();
+        assert_eq!(data.unwrap(), "Hello, world!");
+        assert_eq!(expire, 12345);
+
+        let (data, _expire) = db.try_consume_message("token1").unwrap();
+        assert!(data.is_none());
+    }
+
+    #[test]
+    fn test_clear_expired_messages() {
+        let db = setup_db();
+        db.save_message("token1", 100, "Hello, world!").unwrap();
+        db.save_message("token2", 200, "Hello, again!").unwrap();
+
+        db.clear_expired_messages(160).unwrap();
+        let (data, _expire) = db.try_consume_message("token1").unwrap();
+        assert!(data.is_none());
+
+        let (data, _expire) = db.try_consume_message("token2").unwrap();
+        assert_eq!(data.unwrap(), "Hello, again!");
+    }
+
+    #[test]
+    fn test_remove_user_limits() {
+        let db = setup_db();
+        db.set_user_limits("user1", 60, 1024, 5).unwrap();
+        assert!(db.get_user_limits("user1").unwrap().0);
+
+        db.set_user_limits("user2", 60, 1024, 5).unwrap();
+        assert!(db.get_user_limits("user2").unwrap().0);
+
+        db.remove_user_by_token("user1").unwrap();
+        assert!(!db.get_user_limits("user1").unwrap().0);
+
+        db.remove_user_by_token("user2").unwrap();
+        assert!(!db.get_user_limits("user2").unwrap().0);
+    }
+
+    #[test]
+    fn test_update_user_limits() {
+        let db = setup_db();
+        let token = "321";
+
+        db.set_user_limits(token, 1, 2, 3).unwrap();
+        {
+            let (is_found, retention_limit_minutes, max_size_bytes, creation_limit_minutes) =
+                db.get_user_limits(token).unwrap();
+            assert!(is_found);
+            assert_eq!(retention_limit_minutes, 1);
+            assert_eq!(max_size_bytes, 2);
+            assert_eq!(creation_limit_minutes, 3);
+        }
+
+        db.set_user_limits(token, 4, 5, 6).unwrap();
+        {
+            let (is_found, retention_limit_minutes, max_size_bytes, creation_limit_minutes) =
+                db.get_user_limits(token).unwrap();
+            assert!(is_found);
+            assert_eq!(retention_limit_minutes, 4);
+            assert_eq!(max_size_bytes, 5);
+            assert_eq!(creation_limit_minutes, 6);
+        }
+    }
+
+    #[test]
+    fn test_user_last_message_creation_time() {
+        let db = setup_db();
+        let token = "123";
+
+        db.set_user_limits(token, 1, 2, 3).unwrap();
+
+        {
+            let last_time = db.get_user_last_message_creation_time(token).unwrap();
+            assert_eq!(last_time, 0);
+        }
+
+        {
+            db.set_user_last_message_creation_time(token, 100).unwrap();
+            let last_time = db.get_user_last_message_creation_time(token).unwrap();
+            assert_eq!(last_time, 100);
+        }
+
+        {
+            db.set_user_last_message_creation_time(token, 200).unwrap();
+            let last_time = db.get_user_last_message_creation_time(token).unwrap();
+            assert_eq!(last_time, 200);
+        }
+    }
+
+    #[test]
+    fn test_setting_limits_does_not_change_last_message_creation_time() {
+        let db = setup_db();
+        let token = "123";
+
+        db.set_user_limits(token, 0, 0, 0).unwrap();
+        db.set_user_last_message_creation_time(token, 100).unwrap();
+        assert_eq!(db.get_user_last_message_creation_time(token).unwrap(), 100);
+
+        db.set_user_limits(token, 1, 2, 3).unwrap();
+        assert_eq!(db.get_user_last_message_creation_time(token).unwrap(), 100);
+    }
+}
